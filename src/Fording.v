@@ -1,6 +1,7 @@
-From MetaCoq.Template Require Import Checker utils All.
+(* From MetaCoq.Template Require Import Checker utils All. *)
+From MetaCoq.Template Require Import Checker utils All. 
 Export ListNotations MCMonadNotation.
-Require Export List String.
+(* Require Export List String. *)
 From MetaCoq.PCUIC Require Import PCUICAst PCUICLiftSubst.
 From MetaCoq.PCUIC Require Import PCUICToTemplate TemplateToPCUIC.
 
@@ -11,22 +12,26 @@ Open Scope string_scope.
 Class TslIdent := { tsl_ident : ident -> ident }.
 
 Instance prime_tsl_ident : TslIdent := {| tsl_ident := fun id => id ^ "'" |}.
-Definition name : ident -> ident := fun id => substring 0 1 id.
+(* Definition name : ident -> ident := fun id => substring 0 1 id. *)
 (* Instance prime'_tsl_ident : TslIdent := {| tsl_ident' := fun id => substring 0 1 id |}. *)
 
-Definition make_plugin {X} (f : global_env_ext -> context -> term -> term) (x : X) {Y} : TemplateMonad Y :=
+Definition make_plugin {X} (f : PCUICProgram.global_env_map -> context -> term -> term) (x : X) {Y} : TemplateMonad Y :=
   tmBind (tmQuoteRec x) (fun '(Sigma, q_x) =>
-                         let sig' := (TemplateToPCUIC.trans_global (Sigma, Monomorphic_ctx ContextSet.empty)) in 
+                         let sig' := (TemplateToPCUIC.trans_global_env Sigma) in 
                            tmUnquoteTyped Y 
                            (PCUICToTemplate.trans (f 
-                            sig'
-                             []
-                            (TemplateToPCUIC.trans sig' q_x)))).
+                                                  sig'
+                                                  []
+                                                  (TemplateToPCUIC.trans sig' q_x)))).
 
-Definition try_infer `{config.checker_flags} `{Fuel} (Σ : global_env_ext) Γ t :=
-  match infer' (PCUICToTemplate.trans_global Σ) (PCUICToTemplate.trans_local Γ) (PCUICToTemplate.trans t) with 
-  | Checked res => TemplateToPCUIC.trans Σ res 
-  | TypeError _ => tApp t (tVar "try_infer error")end.
+Definition try_infer `{config.checker_flags} `{Fuel} (Σ : PCUICProgram.global_env_ext_map) Γ t :=
+  let gee := PCUICProgram.global_env_ext_map_global_env_ext Σ in
+  let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
+  let err := "try_infer error" : string in
+  match infer' (PCUICToTemplate.trans_global gee) (PCUICToTemplate.trans_local Γ) (PCUICToTemplate.trans t) with 
+  | Checked res => TemplateToPCUIC.trans gem res
+  | TypeError _ => tApp t (tVar err)
+  end.
 
 (* Polymorphic Inductive eq_poly {A : Type} (x : A) : A -> Prop :=
   eq_refl_poly : eq_poly x x. *)
@@ -39,7 +44,8 @@ returns
 the type of an index eqn abstraction,
 new context (with the new equalities)
 *)
-Definition abstract_eqns (Σ : global_env_ext) (Γ : context) (iter : nat) (t : term) : term * context :=
+Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (t : term) : term * context :=
+  let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
   let fix abstract_eqns (Γ : context) (ty : term) n :=
       match ty with
       | tProd na A B =>
@@ -47,7 +53,7 @@ Definition abstract_eqns (Σ : global_env_ext) (Γ : context) (iter : nat) (t : 
         ((tProd na A ty'), ctx)
       | tApp L R => 
         let type_of_x := try_infer Σ Γ ty in 
-        let eqn := mkApps (tEq Σ) [type_of_x; tRel (2 * n + 1); ty] in
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (2 * n + 1); ty] in
         let namedx := (mkBindAnn (nNamed "x") Relevant) in (* MAYBE: give a better name by inspecting the type *)
         let nanon := (mkBindAnn nAnon Relevant) in 
         ((tProd namedx type_of_x
@@ -90,7 +96,7 @@ Fixpoint build_type (t:term) (args : context) : term :=
   | _ => t
   end.
 
-Definition build_cstr (Σ : global_env_ext) (Γ : context) (iter : nat) (cstr : constructor_body) : constructor_body :=
+Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (cstr : constructor_body) : constructor_body :=
   let inds := map (abstract_eqns Σ Γ iter) (cstr_indices cstr) in
   let (_,args) := compute_args inds (2 * #|inds|) in
   let type := build_type cstr.(cstr_type) (rev args) in
@@ -119,7 +125,7 @@ Fixpoint replace_anon_names (t : term) : term :=
   | _ => t 
   end. 
 
-Polymorphic Definition build_bodies (Σ : global_env_ext) (Γ : context) (bodies : list one_inductive_body)
+Polymorphic Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (bodies : list one_inductive_body)
  (i0 : nat) : list one_inductive_body :=
         mapi (fun (i : nat) (ind : one_inductive_body) => 
         (* I should be used when its mind definition *)
@@ -144,7 +150,7 @@ Fixpoint give_names_to_anon (inds : context) : context :=
                 in h' :: (give_names_to_anon t)
   end.
 
-Polymorphic Definition build_mind (Σ : global_env_ext) (Γ : context) (mind : mutual_inductive_body) (ind0 : inductive): mutual_inductive_body
+Polymorphic Definition build_mind (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (mind : mutual_inductive_body) (ind0 : inductive): mutual_inductive_body
   := 
   (* FIXME: case for mindefs *)
   let inds :=  (match (head (ind_bodies mind)) with None => [] | Some b =>  ind_indices b end) in
@@ -166,21 +172,27 @@ Polymorphic Definition build_mind (Σ : global_env_ext) (Γ : context) (mind : m
 Polymorphic Definition get_ctx {A : Type} (x : A) : TemplateMonad unit :=
      p <-  tmQuoteRec x ;;
      let (genv,tm) :=  (p : Env.program) in
-     let Σ := TemplateToPCUIC.trans_global (genv,Monomorphic_ctx ContextSet.empty) : global_env_ext in 
-     tmPrint Σ.
+     let genv' := TemplateToPCUIC.trans_global_env genv : PCUICProgram.global_env_map in
+     let genv'' := PCUICProgram.trans_env_env genv' in
+     let gem := PCUICProgram.build_global_env_map genv'' in 
+     let gem' := PCUICProgram.global_env_ext_map_global_env_map (genv',Monomorphic_ctx) in
+(*      let Σ := (TemplateToPCUIC.trans_global gem') in  *)
+     tmPrint gem'.
 
 Polymorphic Definition build_ind {A : Type} (x : A)
   : TemplateMonad unit
   := 
      p <-  tmQuoteRec x ;;
      let (genv,tm) :=  (p : Env.program) in
-     let Σ := TemplateToPCUIC.trans_global (genv,Monomorphic_ctx ContextSet.empty) : global_env_ext in 
-     let tm' := TemplateToPCUIC.trans Σ tm in
+     let Σ := TemplateToPCUIC.trans_global (genv,Monomorphic_ctx) : PCUICProgram.global_env_ext_map in 
+     let sig := PCUICProgram.global_env_ext_map_global_env_map Σ in
+     let tm' := TemplateToPCUIC.trans sig tm in
      match tm' with
      | tInd ind0 _ => tmPrint ind0 ;;
            decl <- tmQuoteInductive (inductive_mind ind0) ;;
-           let decl' := (TemplateToPCUIC.trans_minductive_body Σ decl) : mutual_inductive_body in
-           tmPrint Σ ;;
+           let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in 
+           let decl' := (TemplateToPCUIC.trans_minductive_body gem decl) : mutual_inductive_body in
+(*            tmPrint Σ ;; *)
            tmMkInductive' (PCUICToTemplate.trans_minductive_body (build_mind Σ [] decl' ind0)) 
      | _ => tmPrint tm ;; tmFail " is not an inductive"
      end.
@@ -191,10 +203,6 @@ Definition printInductive (q : qualid): TemplateMonad unit :=
   | IndRef ind => (tmQuoteInductive ind.(inductive_mind)) >>= tmPrint
   | _ => tmFail ("[" ^ q ^ "] is not an inductive")
   end.
-
-Inductive nonzero (A : Type) : nat -> Prop := C m :  nonzero A (S m). 
-Inductive nezet (A : Type) (n : nat) : Prop := 
-  C'' m : n = S m -> nezet A n.
 
 Inductive teq (A : Type) (n : nat) : Type :=
     | nileq : n = 0 -> teq A n 

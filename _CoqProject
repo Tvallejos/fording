@@ -1,3 +1,4 @@
 -R . MetaCoq.Fording
 
 src/Fording.v
+src/Examples.v
