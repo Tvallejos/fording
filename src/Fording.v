@@ -188,7 +188,8 @@ Polymorphic Definition build_ind {A : Type} (x : A)
      let sig := PCUICProgram.global_env_ext_map_global_env_map Σ in
      let tm' := TemplateToPCUIC.trans sig tm in
      match tm' with
-     | tInd ind0 _ => tmPrint ind0 ;;
+     | tInd ind0 _ => 
+(*            tmPrint ind0 ;; *)
            decl <- tmQuoteInductive (inductive_mind ind0) ;;
            let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in 
            let decl' := (TemplateToPCUIC.trans_minductive_body gem decl) : mutual_inductive_body in
