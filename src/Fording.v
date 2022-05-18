@@ -27,7 +27,7 @@ Definition make_plugin {X} (f : PCUICProgram.global_env_map -> context -> term -
 Definition try_infer `{config.checker_flags} `{Fuel} (Σ : PCUICProgram.global_env_ext_map) Γ t :=
   let gee := PCUICProgram.global_env_ext_map_global_env_ext Σ in
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
-  let err := "try_infer error" : string in
+  let err := "try_infer_error" : string in
   match infer' (PCUICToTemplate.trans_global gee) (PCUICToTemplate.trans_local Γ) (PCUICToTemplate.trans t) with 
   | Checked res => TemplateToPCUIC.trans gem res
   | TypeError _ => tApp t (tVar err)
@@ -189,12 +189,17 @@ Polymorphic Definition build_ind {A : Type} (x : A)
      let tm' := TemplateToPCUIC.trans sig tm in
      match tm' with
      | tInd ind0 _ => 
-(*            tmPrint ind0 ;; *)
            decl <- tmQuoteInductive (inductive_mind ind0) ;;
+           tmPrint decl ;;
            let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in 
            let decl' := (TemplateToPCUIC.trans_minductive_body gem decl) : mutual_inductive_body in
 (*            tmPrint Σ ;; *)
-           tmMkInductive' (PCUICToTemplate.trans_minductive_body (build_mind Σ [] decl' ind0)) 
+(*            tmPrint decl' ;; *)
+          let mind := build_mind Σ [] decl' ind0 in
+           tmMsg "====================" ;;
+           pmind <- tmEval cbv mind ;; 
+           tmPrint pmind ;;
+           tmMkInductive' (PCUICToTemplate.trans_minductive_body mind) 
      | _ => tmPrint tm ;; tmFail " is not an inductive"
      end.
   
@@ -204,8 +209,3 @@ Definition printInductive (q : qualid): TemplateMonad unit :=
   | IndRef ind => (tmQuoteInductive ind.(inductive_mind)) >>= tmPrint
   | _ => tmFail ("[" ^ q ^ "] is not an inductive")
   end.
-
-Inductive teq (A : Type) (n : nat) : Type :=
-    | nileq : n = 0 -> teq A n 
-    | conseq : A -> forall m : nat, teq A m 
-                    -> forall (e : n = S m), teq A n.
