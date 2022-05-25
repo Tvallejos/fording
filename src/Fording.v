@@ -44,7 +44,31 @@ returns
 the type of an index eqn abstraction,
 new context (with the new equalities)
 *)
-Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (t : term) : term * context :=
+Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (t : term) : (term * context * nat) :=
+  let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
+  let fix abstract_eqns (Γ : context) (ty : term) n :=
+      match ty with
+      | tProd na A B =>
+        let (tyc , n) := (abstract_eqns (Γ ,, vass na A) B 0) : (term * context) * nat in
+        ((tProd na A tyc.1 ), tyc.2 , n)
+      | tApp L R => 
+        let type_of_x := try_infer Σ Γ ty in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (n + 1); ty] in
+        let namedx := (mkBindAnn (nNamed "x") Relevant) in (* MAYBE: give a better name by inspecting the type *)
+        let nanon := (mkBindAnn nAnon Relevant) in 
+        ((tProd namedx type_of_x
+              (tProd nanon eqn 
+                (tRel (n + 1)))), (Γ ,, vass namedx type_of_x ,, vass nanon eqn),S (S n))
+      | _ => 
+        let type_of_x := try_infer Σ Γ ty in 
+        let nanon := mkBindAnn nAnon Relevant in
+        let eqn := mkApps (tEq gem) [type_of_x; tRel n; ty] in
+        ((tProd nanon type_of_x ty),Γ,, vass nanon eqn, S n)
+      end
+  in let (ty',ctx) := abstract_eqns Γ t iter in 
+  (ty',ctx).
+
+(* Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (t : term) : term * context :=
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
   let fix abstract_eqns (Γ : context) (ty : term) n :=
       match ty with
@@ -59,53 +83,69 @@ Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (
         ((tProd namedx type_of_x
               (tProd nanon eqn 
                 (tRel (2 * n + 1)))), (Γ ,, vass namedx type_of_x ,, vass nanon eqn))
-      | _ => (ty,Γ)
+      | _ => 
+        let type_of_x := try_infer Σ Γ ty in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (2 * n); ty] in
+        ((tProd (mkBindAnn nAnon Relevant) type_of_x ty),Γ)
       end
   in let (ty',ctx) := abstract_eqns Γ t iter in 
-  (ty',ctx).
+  (ty',ctx). *)
 
 Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=
   let args := firstn n l in
   let params := skipn n l in
   (params,args).
 
-Definition compute_args (inds : list (term * context)) (ninds : nat): context * context :=
+Definition compute_args (inds : list (term * context)) (nnewvars : nat): context * context :=
+  (* FIXME ELIM DUP MAYBE CHANGE ABS EQUATIONS *)
   let ctxs := flat_map
                 (fun ind=> let (_,ctx) := ind : (term * context) in ctx)
                 inds in
-  let (pars,args) := split_at_n ctxs ninds in
+  let (pars,args) := split_at_n ctxs nnewvars in
   (pars,args).
 
-Definition gen_term_from_args (args : context) : term :=
-  let meq := #|args| in
-  let npars := meq / 2 in 
+(*   FIXME *)
+Fixpoint mkTProds (vars : context) (n : nat) (t : term) :=
+  match n,vars with
+  | O, nil => t
+  | S n', v :: vs => let (na,_,ty) := v in tProd na ty (mkTProds vs n' t)
+  | _,_ => t (* shouldnt happen *)
+  end.
+
+  Definition gen_term_from_args (params args : context) (nnewvars nparams : nat): term := 
+(*   let meq := #|args| in *)
   let fix gen_term_from_args (args : context) :=
   let nap := 
-    (npars+meq+1) in
+    (nparams+nnewvars) in
     match args with
-    | nil => mkApps (tRel nap) (map (fun n=> tRel (n+meq)) (rev (seq 0 (npars + 1))))
+    | nil => mkApps (tRel nap) (map (fun n=> tRel (n+nnewvars)) (rev (seq 0 nparams)))
     | h :: t => let (na,_,ty) := h in
                 tProd na ty (gen_term_from_args t)
     end in
-  gen_term_from_args args.
+  mkTProds params nparams (gen_term_from_args args).
 
-Fixpoint build_type (t:term) (args : context) : term := 
-  match t with
-  | tProd na A B => tProd na A (build_type B args)
-  | tApp L R => gen_term_from_args args
+  (* need to handle more cases? *)
+Definition build_type (t:term) (params args : context) (nargs nparams: nat): term := 
+  gen_term_from_args params args nargs nparams.
+(*   match t with
+  | tProd na A B => tProd na A (build_type B args nargs nparams)
+  | tApp L R => gen_term_from_args args nargs nparams
   | _ => t
-  end.
+  end. *)
 
-Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (cstr : constructor_body) : constructor_body :=
+Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (nparams iter : nat) (cstr : constructor_body) : constructor_body :=
   let inds := map (abstract_eqns Σ Γ iter) (cstr_indices cstr) in
-  let (_,args) := compute_args inds (2 * #|inds|) in
-  let type := build_type cstr.(cstr_type) (rev args) in
+  (* IT DEPENDS ON THE TYPE OF THE IDX *)
+(*   let (_,args) := compute_args inds (2 * #|inds|) in *)
+  let nnewvars := list_sum (map (fun i => i.2) inds) in
+  let (params,args) := compute_args (map (fun i => i.1) inds) (nnewvars + nparams)  in
+  let type := build_type cstr.(cstr_type) (rev params) (rev args) nnewvars nparams in
   {|
     cstr_name:= tsl_ident (cstr_name cstr) ;
-    cstr_args := args;
+    cstr_args := (firstn nnewvars args) ; 
     cstr_indices := []; 
     cstr_type := type;
-    cstr_arity := #|args|
+    cstr_arity := nnewvars
   |}.
 
 (* Notation "<%% x %%>" := (TemplateToPCUIC.trans [] <% x %>) (only parsing). *)
@@ -126,14 +166,14 @@ Fixpoint replace_anon_names (t : term) : term :=
   end. 
 
 Polymorphic Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (bodies : list one_inductive_body)
- (i0 : nat) : list one_inductive_body :=
+ (i0 : nat) (nparams : nat) : list one_inductive_body :=
         mapi (fun (i : nat) (ind : one_inductive_body) => 
         (* I should be used when its mind definition *)
           {| 
           ind_name := tsl_ident (ind_name ind);
           ind_indices := [];
           ind_type  := replace_anon_names ind.(ind_type) ; 
-          ind_ctors :=  mapi (build_cstr Σ Γ ) (ind_ctors ind) ;
+          ind_ctors :=  mapi (build_cstr Σ Γ nparams) (ind_ctors ind) ;
           (* just proj below *)
           ind_sort := ind.(ind_sort);
           ind_kelim := ind.(ind_kelim) ;
@@ -156,14 +196,15 @@ Polymorphic Definition build_mind (Σ : PCUICProgram.global_env_ext_map) (Γ : c
   let inds :=  (match (head (ind_bodies mind)) with None => [] | Some b =>  ind_indices b end) in
   let inds' := give_names_to_anon inds in
   let params' := app inds' mind.(ind_params) in
+  let nparams := mind.(ind_npars) + #|inds'| in
   let i0 := inductive_ind ind0 in
      {| ind_finite := mind.(ind_finite);
-        ind_npars := mind.(ind_npars) + #|inds'|;
+        ind_npars :=  nparams;
         ind_params :=  params' ;
         ind_universes := mind.(ind_universes) ; (* how to infer universes? *) (* infer it later usign mkInductive'*)
         ind_variance := mind.(ind_variance);
         ind_bodies :=  
-        build_bodies Σ (app params' Γ) (mind.(ind_bodies)) i0 (* params' *)
+        build_bodies Σ (app params' Γ) (mind.(ind_bodies)) i0 nparams (* params' *)
       |}.
 
 (* Axiom todo : forall A : Type, A. *)
@@ -190,16 +231,24 @@ Polymorphic Definition build_ind {A : Type} (x : A)
      match tm' with
      | tInd ind0 _ => 
            decl <- tmQuoteInductive (inductive_mind ind0) ;;
-           tmPrint decl ;;
            let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in 
            let decl' := (TemplateToPCUIC.trans_minductive_body gem decl) : mutual_inductive_body in
 (*            tmPrint Σ ;; *)
 (*            tmPrint decl' ;; *)
+           declred <- tmEval cbv decl' ;;
+           tmPrint declred ;;
           let mind := build_mind Σ [] decl' ind0 in
-           tmMsg "====================" ;;
-           pmind <- tmEval cbv mind ;; 
-           tmPrint pmind ;;
-           tmMkInductive' (PCUICToTemplate.trans_minductive_body mind) 
+           tmMsg "==================== ind0" ;;
+           tmPrint ind0 ;;
+(*            tmMsg "==================== tmind" ;; *)
+          let tmind := (PCUICToTemplate.trans_minductive_body mind) in
+           mind <- tmEval cbv mind ;; 
+(*            tmPrint tmind ;;
+           tmMsg "==================== " ;;*)
+           tmMsg "==================== mind" ;;
+           tmPrint mind ;; 
+(*            tmMkInductive' (PCUICToTemplate.trans_minductive_body mind)  *)
+           tmMkInductive' tmind
      | _ => tmPrint tm ;; tmFail " is not an inductive"
      end.
   
