@@ -7,9 +7,31 @@ Inductive nonzero (A : Type) : nat -> Prop :=
 Inductive nzexpected (A : Type) (n : nat) : Prop := 
   C'' m : n = S m -> nzexpected A n.
 
-(* MetaCoq Run (printInductive "nzexpected"). *)
+Inductive nzexpected2 (A : Type) (n : nat) : Prop := 
+  C2'' : forall m : nat,  n = S m -> nzexpected2 A n.
+
+MetaCoq Run (printInductive "nonzero").
 MetaCoq Run (build_ind nonzero).
+
+About C.
+About C'.
+About C''.
+About C2''.
 MetaCoq Run (cmp_inds "nonzero'" "nzexpected").
+MetaCoq Run (cmp_inds "nonzero'" "nzexpected2").
+
+
+Inductive zList (A : Type) : nat -> Type :=
+| znil : zList A 0.
+
+Inductive zLexpected (A : Type) (n : nat) : Type :=
+| znilexpected : n = 0 -> zLexpected A n.
+
+MetaCoq Run (build_ind zList).
+MetaCoq Run (cmp_inds "zList'" "zLexpected").
+
+About znil'.
+About znilexpected.
 
 Inductive nList (A : Type) : nat -> Type :=
 | nnil : nList A 0
@@ -21,27 +43,24 @@ Inductive nList (A : Type) : nat -> Type :=
     | conseq : A -> forall m : nat, teq A m ->
                     n = S m -> teq A n. *)
 
-Inductive teq' (A : Type) (n : nat) : Type :=
+(* Inductive teq' (A : Type) (n : nat) : Type :=
     | nileq' : n = 0 -> teq' A n 
     | conseq' m : A -> teq' A m ->
-                    n = S m -> teq' A n.
+                    n = S m -> teq' A n. *)
 
-Inductive nList' (A : Type) : nat -> Type :=
-| nnil' : nList' A 0
-| ncons' m : A -> nList' A m ->
-              nList' A (S m).
+Inductive teqexpected (A : Type) (n : nat) : Type :=
+    | nilteqexpected : n = 0 -> teqexpected A n 
+    | consteqexpected : A -> forall m : nat, teqexpected A m ->
+                    n = S m -> teqexpected A n.
 
-Inductive zList (A : Type) : nat -> Type :=
-| znil : zList A 0.
+(* Inductive teqexpected (A : Type) (n : nat) : Type :=
+    | nilteqexpected : n = 0 -> teqexpected A n 
+    | consteqexpected : A -> forall m : nat, teqexpected A m ->
+                                                      n = S m -> teqexpected A n. *)
 
-Inductive zLexpected (A : Type) (n : nat) : Type :=
-| znilexpected : n = 0 -> zLexpected A n.
-
-MetaCoq Run (printInductive "zLexpected").
-MetaCoq Run (build_ind zList).
-MetaCoq Run (cmp_inds "zList'" "zLexpected").
-
-
+MetaCoq Run (printInductive "teqexpected").
+MetaCoq Run (build_ind nList').
+MetaCoq Run (cmp_inds "nList''" "teq'").
 
                     
 (* MetaCoq Run (build_ind teq).

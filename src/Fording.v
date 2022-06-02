@@ -44,51 +44,42 @@ returns
 the type of an index eqn abstraction,
 new context (with the new equalities)
 *)
-Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (t : term) : (term * context * nat) :=
+Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npars arity idx_num : nat) (t : term) : term :=
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
-  let fix abstract_eqns (Γ : context) (ty : term) n :=
+  let abstract_eqns (Γ : context) (ty : term) :=
       match ty with
-      | tProd na A B =>
-        let (tyc , n) := (abstract_eqns (Γ ,, vass na A) B 0) : (term * context) * nat in
-        ((tProd na A tyc.1 ), tyc.2 , n)
       | tApp L R => 
-        let type_of_x := try_infer Σ Γ ty in 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel (n + 1); ty] in
-        let namedx := (mkBindAnn (nNamed "x") Relevant) in (* MAYBE: give a better name by inspecting the type *)
-        let nanon := (mkBindAnn nAnon Relevant) in 
-        ((tProd namedx type_of_x
-              (tProd nanon eqn 
-                (tRel (n + 1)))), (Γ ,, vass namedx type_of_x ,, vass nanon eqn),S (S n))
+        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num) ; tApp L (lift (idx_num) 0 R)] in
+        eqn
+(*          (Γ ,, vass namedx type_of_x ,, vass nanon eqn, 2) *)
       | _ => 
-        let type_of_x := try_infer Σ Γ ty in 
-        let nanon := mkBindAnn nAnon Relevant in
-        let eqn := mkApps (tEq gem) [type_of_x; tRel n; ty] in
-        ((tProd nanon type_of_x ty),Γ,, vass nanon eqn, S n)
+        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel idx_num; ty] in
+        eqn
       end
-  in let (ty',ctx) := abstract_eqns Γ t iter in 
-  (ty',ctx).
+  in abstract_eqns Γ t.
+  
 
-(* Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (iter : nat) (t : term) : term * context :=
+(* Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npars arity idx_num : nat) (t : term) : (context * nat) :=
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
-  let fix abstract_eqns (Γ : context) (ty : term) n :=
+  let abstract_eqns (Γ : context) (ty : term) :=
       match ty with
-      | tProd na A B =>
-        let (ty' , ctx) := (abstract_eqns (Γ ,, vass na A) B 0) in
-        ((tProd na A ty'), ctx)
       | tApp L R => 
-        let type_of_x := try_infer Σ Γ ty in 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel (2 * n + 1); ty] in
-        let namedx := (mkBindAnn (nNamed "x") Relevant) in (* MAYBE: give a better name by inspecting the type *)
+        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num) ; tApp L (lift (idx_num) 0 R)] in
+(*         let namedx := (mkBindAnn (nNamed "new_name_abeq") Relevant) in  *)
+        (* MAYBE: give a better name by inspecting the type *)
         let nanon := (mkBindAnn nAnon Relevant) in 
-        ((tProd namedx type_of_x
-              (tProd nanon eqn 
-                (tRel (2 * n + 1)))), (Γ ,, vass namedx type_of_x ,, vass nanon eqn))
+         (Γ ,, vass nanon eqn, 1)
+(*          (Γ ,, vass namedx type_of_x ,, vass nanon eqn, 2) *)
       | _ => 
-        let type_of_x := try_infer Σ Γ ty in 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel (2 * n); ty] in
-        ((tProd (mkBindAnn nAnon Relevant) type_of_x ty),Γ)
+        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
+        let nanon := mkBindAnn nAnon Relevant in
+        let eqn := mkApps (tEq gem) [type_of_x; tRel idx_num; ty] in
+        (Γ,, vass nanon eqn, S idx_num)
       end
-  in let (ty',ctx) := abstract_eqns Γ t iter in 
+  in let (ty',ctx) := abstract_eqns Γ t in 
   (ty',ctx). *)
 
 Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=
@@ -96,63 +87,80 @@ Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=
   let params := skipn n l in
   (params,args).
 
-Definition compute_args (inds : list (term * context)) (nnewvars : nat): context * context :=
+Definition compute_args (inds : list context) (nnewvars : nat): context * context :=
   (* FIXME ELIM DUP MAYBE CHANGE ABS EQUATIONS *)
   let ctxs := flat_map
-                (fun ind=> let (_,ctx) := ind : (term * context) in ctx)
+                (fun ind=> let ctx := ind : context in ctx)
                 inds in
   let (pars,args) := split_at_n ctxs nnewvars in
   (pars,args).
 
 (*   FIXME *)
-Fixpoint mkTProds (vars : context) (n : nat) (t : term) :=
+(* Fixpoint mkTProds (vars : context) (n : nat) (t : term) :=
   match n,vars with
   | O, nil => t
   | S n', v :: vs => let (na,_,ty) := v in tProd na ty (mkTProds vs n' t)
   | _,_ => t (* shouldnt happen *)
+  end. *)
+
+Fixpoint mkTProds (vars : context) (t : term) :=
+  match vars with
+  | nil => t
+  | v :: vs => let (na,_,ty) := v in tProd na ty (mkTProds vs t)
   end.
 
-  Definition gen_term_from_args (params args : context) (nnewvars nparams : nat): term := 
+
+  Definition gen_term_from_args (args : context) (nnewvars nparams : nat) : term := 
 (*   let meq := #|args| in *)
   let fix gen_term_from_args (args : context) :=
-  let nap := 
-    (nparams+nnewvars) in
+  let nap := nparams+nnewvars in
     match args with
-    | nil => mkApps (tRel nap) (map (fun n=> tRel (n+nnewvars)) (rev (seq 0 nparams)))
+    | nil => mkApps (tRel (nap+1)) (map (fun n=> tRel n) (rev (seq (nap-nparams+1) nap)))
+(*     | nil => mkApps (tRel (nap+1)) (map (fun n=> tRel (n+(nnewvars+1))) (rev (seq (nap-nparams) nap))) *)
     | h :: t => let (na,_,ty) := h in
                 tProd na ty (gen_term_from_args t)
     end in
-  mkTProds params nparams (gen_term_from_args args).
+  gen_term_from_args args.
 
   (* need to handle more cases? *)
-Definition build_type (t:term) (params args : context) (nargs nparams: nat): term := 
-  gen_term_from_args params args nargs nparams.
+Definition build_type (t:term) (args : context) (nnewvars nparams : nat) : term := 
+  gen_term_from_args args nnewvars nparams.
 (*   match t with
   | tProd na A B => tProd na A (build_type B args nargs nparams)
   | tApp L R => gen_term_from_args args nargs nparams
   | _ => t
   end. *)
-
+About fold_left.
 Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (nparams iter : nat) (cstr : constructor_body) : constructor_body :=
-  let inds := map (abstract_eqns Σ Γ iter) (cstr_indices cstr) in
+  let ctx := (app (cstr_args cstr) Γ) in
+  let inds := mapi (abstract_eqns Σ ctx nparams (cstr_arity cstr)) (cstr_indices cstr) in
+  (* TODO IS ARITY GOOD?*)
   (* IT DEPENDS ON THE TYPE OF THE IDX *)
 (*   let (_,args) := compute_args inds (2 * #|inds|) in *)
-  let nnewvars := list_sum (map (fun i => i.2) inds) in
-  let (params,args) := compute_args (map (fun i => i.1) inds) (nnewvars + nparams)  in
-  let type := build_type cstr.(cstr_type) (rev params) (rev args) nnewvars nparams in
+(*   let nnewvars := list_sum (map (fun i => i.2) inds) in *)
+  let nnewvars := #|inds| in
+(*   let (params,args) := compute_args (map (fun i => i.1) inds) (nnewvars + nparams)  in *)
+(*   let (params,args) := compute_args inds nparams in *)
+  let nanon := (mkBindAnn nAnon Relevant) in 
+  let args := fold_left (fun g eq=> g ,, vass nanon eq) inds ctx in 
+  let type := build_type cstr.(cstr_type) (rev args) #|inds| nparams in 
+  let new_arity :=cstr.(cstr_arity) + nnewvars in
+(*   (nnewvars + #|(cstr_args cstr)|) nparams in *)
   {|
     cstr_name:= tsl_ident (cstr_name cstr) ;
-    cstr_args := (firstn nnewvars args) ; 
+    (* TODO: when more than 1 index should be ctx + fold app of terms *)
+(*     cstr_args := (flat_map (fun i => i.1) inds) ; *)
+    cstr_args := firstn new_arity args ;
     cstr_indices := []; 
     cstr_type := type;
-    cstr_arity := nnewvars
+    cstr_arity := new_arity
   |}.
 
 (* Notation "<%% x %%>" := (TemplateToPCUIC.trans [] <% x %>) (only parsing). *)
 
 Definition change_name (name : aname) : aname := 
   let (bind,relev) := name in
-  let newName := "n" in
+  let newName := "new_name_change_name" in
   let newBind :=  (match bind with 
                   | nAnon => nNamed newName
                   | _ => bind end) 
@@ -168,7 +176,7 @@ Fixpoint replace_anon_names (t : term) : term :=
 Polymorphic Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (bodies : list one_inductive_body)
  (i0 : nat) (nparams : nat) : list one_inductive_body :=
         mapi (fun (i : nat) (ind : one_inductive_body) => 
-        (* I should be used when its mind definition *)
+        (* 'i' should be used when its mind definition *)
           {| 
           ind_name := tsl_ident (ind_name ind);
           ind_indices := [];
@@ -192,7 +200,7 @@ Fixpoint give_names_to_anon (inds : context) : context :=
 
 Polymorphic Definition build_mind (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (mind : mutual_inductive_body) (ind0 : inductive): mutual_inductive_body
   := 
-  (* FIXME: case for mindefs *)
+  (* TODO: case for mindefs *)
   let inds :=  (match (head (ind_bodies mind)) with None => [] | Some b =>  ind_indices b end) in
   let inds' := give_names_to_anon inds in
   let params' := app inds' mind.(ind_params) in
