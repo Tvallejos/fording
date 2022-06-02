@@ -115,8 +115,7 @@ Fixpoint mkTProds (vars : context) (t : term) :=
   let fix gen_term_from_args (args : context) :=
   let nap := nparams+nnewvars in
     match args with
-    | nil => mkApps (tRel (nap+1)) (map (fun n=> tRel n) (rev (seq (nap-nparams+1) nap)))
-(*     | nil => mkApps (tRel (nap+1)) (map (fun n=> tRel (n+(nnewvars+1))) (rev (seq (nap-nparams) nap))) *)
+    | nil => mkApps (tRel (nap+1)) (map (fun n=> tRel n) (rev (seq (nap-nparams+1) (nap-1))))
     | h :: t => let (na,_,ty) := h in
                 tProd na ty (gen_term_from_args t)
     end in
