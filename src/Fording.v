@@ -12,8 +12,6 @@ Open Scope string_scope.
 Class TslIdent := { tsl_ident : ident -> ident }.
 
 Instance prime_tsl_ident : TslIdent := {| tsl_ident := fun id => id ^ "'" |}.
-(* Definition name : ident -> ident := fun id => substring 0 1 id. *)
-(* Instance prime'_tsl_ident : TslIdent := {| tsl_ident' := fun id => substring 0 1 id |}. *)
 
 Definition make_plugin {X} (f : PCUICProgram.global_env_map -> context -> term -> term) (x : X) {Y} : TemplateMonad Y :=
   tmBind (tmQuoteRec x) (fun '(Sigma, q_x) =>
@@ -52,7 +50,6 @@ Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (
         let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
         let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num) ; tApp L (lift (idx_num) 0 R)] in
         eqn
-(*          (Γ ,, vass namedx type_of_x ,, vass nanon eqn, 2) *)
       | _ => 
         let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
         let eqn := mkApps (tEq gem) [type_of_x; tRel idx_num; ty] in
@@ -60,27 +57,6 @@ Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (
       end
   in abstract_eqns Γ t.
   
-
-(* Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npars arity idx_num : nat) (t : term) : (context * nat) :=
-  let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
-  let abstract_eqns (Γ : context) (ty : term) :=
-      match ty with
-      | tApp L R => 
-        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num) ; tApp L (lift (idx_num) 0 R)] in
-(*         let namedx := (mkBindAnn (nNamed "new_name_abeq") Relevant) in  *)
-        (* MAYBE: give a better name by inspecting the type *)
-        let nanon := (mkBindAnn nAnon Relevant) in 
-         (Γ ,, vass nanon eqn, 1)
-(*          (Γ ,, vass namedx type_of_x ,, vass nanon eqn, 2) *)
-      | _ => 
-        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
-        let nanon := mkBindAnn nAnon Relevant in
-        let eqn := mkApps (tEq gem) [type_of_x; tRel idx_num; ty] in
-        (Γ,, vass nanon eqn, S idx_num)
-      end
-  in let (ty',ctx) := abstract_eqns Γ t in 
-  (ty',ctx). *)
 
 Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=
   let args := firstn n l in
@@ -95,31 +71,15 @@ Definition compute_args (inds : list context) (nnewvars : nat): context * contex
   let (pars,args) := split_at_n ctxs nnewvars in
   (pars,args).
 
-(*   FIXME *)
-(* Fixpoint mkTProds (vars : context) (n : nat) (t : term) :=
-  match n,vars with
-  | O, nil => t
-  | S n', v :: vs => let (na,_,ty) := v in tProd na ty (mkTProds vs n' t)
-  | _,_ => t (* shouldnt happen *)
-  end. *)
-
 Fixpoint mkTProds (vars : context) (t : term) :=
   match vars with
   | nil => t
   | v :: vs => let (na,_,ty) := v in tProd na ty (mkTProds vs t)
   end.
 
-Compute seq 2 (4-1).
-Compute seq 4 2.
-Compute seq 4 3.
-Compute cons (4) (rev (seq 2 (4-2))).
-
-
   Definition gen_term_from_args (args : context) (nnewvars nparams : nat) : term := 
-(*   let meq := #|args| in *)
   let nap := #|args| + nnewvars in
   let fix gen_term_from_args (args : context) :=
-(*   nparams+nnewvars in *)
     match args with
     | nil => mkApps (tRel (nap-1)) (map (fun n=> tRel n) (rev (seq (nap-nparams-1) nparams)))
     | h :: t => let (na,_,ty) := h in
@@ -127,15 +87,8 @@ Compute cons (4) (rev (seq 2 (4-2))).
     end in
   gen_term_from_args args.
 
-  (* need to handle more cases? *)
 Definition build_type (t:term) (args : context) (nnewvars nparams : nat) : term := 
   gen_term_from_args args nnewvars nparams.
-(*   match t with
-  | tProd na A B => tProd na A (build_type B args nargs nparams)
-  | tApp L R => gen_term_from_args args nargs nparams
-  | _ => t
-  end. *)
-About fold_left.
 
 Definition lift_decl (n from : nat) (decl : context_decl ) : context_decl :=
   let (na, bdy, ty) := decl in 
@@ -147,54 +100,11 @@ Fixpoint lift_ctx (n from : nat) (ctx: list context_decl) : list context_decl :=
   | d :: ds => lift_decl n from d :: lift_ctx n (from+1) ds
   end.
 
-Definition args :=
-  [
-             {|
-               BasicAst.decl_name :=
-                 {|
-                   BasicAst.binder_name := BasicAst.nAnon;
-                   BasicAst.binder_relevance := BasicAst.Relevant
-                 |};
-               BasicAst.decl_body := None;
-               BasicAst.decl_type :=
-                 PCUICAst.tApp
-                   (PCUICAst.tApp (PCUICAst.tRel 3) (PCUICAst.tRel 2))
-                   (PCUICAst.tRel 0)
-             |};
-             {|
-               BasicAst.decl_name :=
-                 {|
-                   BasicAst.binder_name := BasicAst.nNamed "m";
-                   BasicAst.binder_relevance := BasicAst.Relevant
-                 |};
-               BasicAst.decl_body := None;
-               BasicAst.decl_type :=
-                 PCUICAst.tInd
-                   {|
-                     Kernames.inductive_mind :=
-                       (Kernames.MPfile ["Datatypes"; "Init"; "Coq"], "nat");
-                     Kernames.inductive_ind := 0
-                   |} []
-             |};
-             {|
-               BasicAst.decl_name :=
-                 {|
-                   BasicAst.binder_name := BasicAst.nAnon;
-                   BasicAst.binder_relevance := BasicAst.Relevant
-                 |};
-               BasicAst.decl_body := None;
-               BasicAst.decl_type := PCUICAst.tRel 0
-             |}].
-
-Definition ctx := rev (lift_ctx 1 0 (rev args)).
-Compute fold_left (fun g eq=> g ,, vass (mkBindAnn nAnon Relevant) eq) [tRel 0] ctx.
-
 Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (nparams iter : nat) (cstr : constructor_body) : constructor_body :=
 (*   let ctx_ := (app (cstr_args cstr) Γ) in *)
   let ctx_ := (cstr_args cstr) in
   let cstr_inds := (cstr_indices cstr) in
   let nnewvars := #|cstr_inds| in
-(*   let nnewvars := 1 in *)
   let ctx := (app (rev (lift_ctx nnewvars 0 (rev ctx_))) Γ) in
   let inds := mapi (abstract_eqns Σ ctx nparams (cstr_arity cstr)) cstr_inds in
   (* TODO IS ARITY GOOD?*)
@@ -206,7 +116,6 @@ Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npa
 
   {|
     cstr_name:= tsl_ident (cstr_name cstr) ;
-    (* TODO: when more than 1 index should be ctx + fold app of terms *)
     cstr_args := firstn new_arity new_ctx;
     cstr_indices := []; 
     cstr_type := type;
