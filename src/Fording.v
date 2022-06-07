@@ -109,13 +109,19 @@ Fixpoint mkTProds (vars : context) (t : term) :=
   | v :: vs => let (na,_,ty) := v in tProd na ty (mkTProds vs t)
   end.
 
+Compute seq 2 (4-1).
+Compute seq 4 2.
+Compute seq 4 3.
+Compute cons (4) (rev (seq 2 (4-2))).
+
 
   Definition gen_term_from_args (args : context) (nnewvars nparams : nat) : term := 
 (*   let meq := #|args| in *)
+  let nap := #|args| + nnewvars in
   let fix gen_term_from_args (args : context) :=
-  let nap := nparams+nnewvars in
+(*   nparams+nnewvars in *)
     match args with
-    | nil => mkApps (tRel (nap+1)) (map (fun n=> tRel n) (rev (seq (nap-nparams+1) (nap-1))))
+    | nil => mkApps (tRel (nap-1)) (map (fun n=> tRel n) (rev (seq (nap-nparams-1) nparams)))
     | h :: t => let (na,_,ty) := h in
                 tProd na ty (gen_term_from_args t)
     end in
@@ -130,26 +136,78 @@ Definition build_type (t:term) (args : context) (nnewvars nparams : nat) : term 
   | _ => t
   end. *)
 About fold_left.
+
+Definition lift_decl (n from : nat) (decl : context_decl ) : context_decl :=
+  let (na, bdy, ty) := decl in 
+  {| decl_name := na; decl_body := bdy; decl_type := (lift n from ty)|}.
+
+Fixpoint lift_ctx (n from : nat) (ctx: list context_decl) : list context_decl :=
+  match ctx with
+  | nil => nil
+  | d :: ds => lift_decl n from d :: lift_ctx n (from+1) ds
+  end.
+
+Definition args :=
+  [
+             {|
+               BasicAst.decl_name :=
+                 {|
+                   BasicAst.binder_name := BasicAst.nAnon;
+                   BasicAst.binder_relevance := BasicAst.Relevant
+                 |};
+               BasicAst.decl_body := None;
+               BasicAst.decl_type :=
+                 PCUICAst.tApp
+                   (PCUICAst.tApp (PCUICAst.tRel 3) (PCUICAst.tRel 2))
+                   (PCUICAst.tRel 0)
+             |};
+             {|
+               BasicAst.decl_name :=
+                 {|
+                   BasicAst.binder_name := BasicAst.nNamed "m";
+                   BasicAst.binder_relevance := BasicAst.Relevant
+                 |};
+               BasicAst.decl_body := None;
+               BasicAst.decl_type :=
+                 PCUICAst.tInd
+                   {|
+                     Kernames.inductive_mind :=
+                       (Kernames.MPfile ["Datatypes"; "Init"; "Coq"], "nat");
+                     Kernames.inductive_ind := 0
+                   |} []
+             |};
+             {|
+               BasicAst.decl_name :=
+                 {|
+                   BasicAst.binder_name := BasicAst.nAnon;
+                   BasicAst.binder_relevance := BasicAst.Relevant
+                 |};
+               BasicAst.decl_body := None;
+               BasicAst.decl_type := PCUICAst.tRel 0
+             |}].
+
+Definition ctx := rev (lift_ctx 1 0 (rev args)).
+Compute fold_left (fun g eq=> g ,, vass (mkBindAnn nAnon Relevant) eq) [tRel 0] ctx.
+
 Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (nparams iter : nat) (cstr : constructor_body) : constructor_body :=
-  let ctx := (app (cstr_args cstr) Γ) in
-  let inds := mapi (abstract_eqns Σ ctx nparams (cstr_arity cstr)) (cstr_indices cstr) in
+(*   let ctx_ := (app (cstr_args cstr) Γ) in *)
+  let ctx_ := (cstr_args cstr) in
+  let cstr_inds := (cstr_indices cstr) in
+  let nnewvars := #|cstr_inds| in
+(*   let nnewvars := 1 in *)
+  let ctx := (app (rev (lift_ctx nnewvars 0 (rev ctx_))) Γ) in
+  let inds := mapi (abstract_eqns Σ ctx nparams (cstr_arity cstr)) cstr_inds in
   (* TODO IS ARITY GOOD?*)
   (* IT DEPENDS ON THE TYPE OF THE IDX *)
-(*   let (_,args) := compute_args inds (2 * #|inds|) in *)
-(*   let nnewvars := list_sum (map (fun i => i.2) inds) in *)
-  let nnewvars := #|inds| in
-(*   let (params,args) := compute_args (map (fun i => i.1) inds) (nnewvars + nparams)  in *)
-(*   let (params,args) := compute_args inds nparams in *)
   let nanon := (mkBindAnn nAnon Relevant) in 
-  let args := fold_left (fun g eq=> g ,, vass nanon eq) inds ctx in 
-  let type := build_type cstr.(cstr_type) (rev args) #|inds| nparams in 
+  let new_ctx := fold_left (fun g eq=> g ,, vass nanon eq) inds ctx in 
+  let type := build_type cstr.(cstr_type) (rev new_ctx) nnewvars nparams in 
   let new_arity :=cstr.(cstr_arity) + nnewvars in
-(*   (nnewvars + #|(cstr_args cstr)|) nparams in *)
+
   {|
     cstr_name:= tsl_ident (cstr_name cstr) ;
     (* TODO: when more than 1 index should be ctx + fold app of terms *)
-(*     cstr_args := (flat_map (fun i => i.1) inds) ; *)
-    cstr_args := firstn new_arity args ;
+    cstr_args := firstn new_arity new_ctx;
     cstr_indices := []; 
     cstr_type := type;
     cstr_arity := new_arity
@@ -240,21 +298,15 @@ Polymorphic Definition build_ind {A : Type} (x : A)
            decl <- tmQuoteInductive (inductive_mind ind0) ;;
            let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in 
            let decl' := (TemplateToPCUIC.trans_minductive_body gem decl) : mutual_inductive_body in
-(*            tmPrint Σ ;; *)
-(*            tmPrint decl' ;; *)
            declred <- tmEval cbv decl' ;;
-           tmPrint declred ;;
+(*            tmPrint declred ;; *)
           let mind := build_mind Σ [] decl' ind0 in
-           tmMsg "==================== ind0" ;;
-           tmPrint ind0 ;;
-(*            tmMsg "==================== tmind" ;; *)
+(*            tmMsg "==================== ind0" ;;
+           tmPrint ind0 ;; *)
           let tmind := (PCUICToTemplate.trans_minductive_body mind) in
            mind <- tmEval cbv mind ;; 
-(*            tmPrint tmind ;;
-           tmMsg "==================== " ;;*)
-           tmMsg "==================== mind" ;;
-           tmPrint mind ;; 
-(*            tmMkInductive' (PCUICToTemplate.trans_minductive_body mind)  *)
+(*            tmMsg "==================== mind" ;;
+           tmPrint mind ;;  *)
            tmMkInductive' tmind
      | _ => tmPrint tm ;; tmFail " is not an inductive"
      end.
