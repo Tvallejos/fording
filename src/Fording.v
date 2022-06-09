@@ -47,12 +47,13 @@ Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (
   let abstract_eqns (Γ : context) (ty : term) :=
       match ty with
       | tApp L R => 
-        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num) ; tApp L (lift (idx_num) 0 R)] in
+        let type_of_x := try_infer Σ Γ (lift (idx_num-1) 0 ty) in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num-1) ; tApp L (lift (idx_num-1) 0 R)] in
+(*         let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+idx_num) ; tApp L (lift (idx_num) 0 R)] in *)
         eqn
       | _ => 
-        let type_of_x := try_infer Σ Γ (lift idx_num 0 ty) in 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel idx_num; ty] in
+        let type_of_x := try_infer Σ Γ (lift (idx_num-1) 0 ty) in 
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (idx_num-1); ty] in
         eqn
       end
   in abstract_eqns Γ t.
@@ -63,13 +64,13 @@ Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=
   let params := skipn n l in
   (params,args).
 
-Definition compute_args (inds : list context) (nnewvars : nat): context * context :=
+(* Definition compute_args (inds : list context) (nnewvars : nat): context * context :=
   (* FIXME ELIM DUP MAYBE CHANGE ABS EQUATIONS *)
   let ctxs := flat_map
                 (fun ind=> let ctx := ind : context in ctx)
                 inds in
   let (pars,args) := split_at_n ctxs nnewvars in
-  (pars,args).
+  (pars,args). *)
 
 Fixpoint mkTProds (vars : context) (t : term) :=
   match vars with
@@ -78,10 +79,12 @@ Fixpoint mkTProds (vars : context) (t : term) :=
   end.
 
   Definition gen_term_from_args (args : context) (nnewvars nparams : nat) : term := 
-  let nap := #|args| + nnewvars in
+(*   let nap := #|args| + nnewvars in *)
+  let nap := #|args| in
   let fix gen_term_from_args (args : context) :=
     match args with
-    | nil => mkApps (tRel (nap-1)) (map (fun n=> tRel n) (rev (seq (nap-nparams-1) nparams)))
+(*     | nil => mkApps (tRel (nap-1)) (map (fun n=> tRel n) (rev (seq (nap-nparams-1) nparams))) *)
+    | nil => mkApps (tRel (nap)) (map (fun n=> tRel n) (rev (seq (nap-nparams) nparams)))
     | h :: t => let (na,_,ty) := h in
                 tProd na ty (gen_term_from_args t)
     end in
@@ -106,7 +109,8 @@ Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npa
   let cstr_inds := (cstr_indices cstr) in
   let nnewvars := #|cstr_inds| in
   let ctx := (app (rev (lift_ctx nnewvars 0 (rev ctx_))) Γ) in
-  let inds := mapi (abstract_eqns Σ ctx nparams (cstr_arity cstr)) cstr_inds in
+(*   let inds := mapi (abstract_eqns Σ ctx nparams (cstr_arity cstr)) cstr_inds in *)
+  let inds := map (abstract_eqns Σ ctx nparams (cstr_arity cstr) nnewvars) cstr_inds in
   (* TODO IS ARITY GOOD?*)
   (* IT DEPENDS ON THE TYPE OF THE IDX *)
   let nanon := (mkBindAnn nAnon Relevant) in 
@@ -208,14 +212,14 @@ Polymorphic Definition build_ind {A : Type} (x : A)
            let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in 
            let decl' := (TemplateToPCUIC.trans_minductive_body gem decl) : mutual_inductive_body in
            declred <- tmEval cbv decl' ;;
-(*            tmPrint declred ;; *)
+           tmPrint declred ;;
           let mind := build_mind Σ [] decl' ind0 in
 (*            tmMsg "==================== ind0" ;;
            tmPrint ind0 ;; *)
           let tmind := (PCUICToTemplate.trans_minductive_body mind) in
            mind <- tmEval cbv mind ;; 
-(*            tmMsg "==================== mind" ;;
-           tmPrint mind ;;  *)
+           tmMsg "==================== mind" ;;
+           tmPrint mind ;; 
            tmMkInductive' tmind
      | _ => tmPrint tm ;; tmFail " is not an inductive"
      end.
