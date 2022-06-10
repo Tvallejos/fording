@@ -61,6 +61,7 @@ Inductive List_cons (A : Type) : nat -> nat -> Type :=
 | jcons : A -> forall o p: nat, List_cons A o p ->
               List_cons A (S o) (S (S p)).
 
+
 Inductive cons_ex (A : Type) (n m : nat) : Type :=
     | jcons_size_ex : A -> forall m' m'' : nat, cons_ex A m' m'' ->
                     n = S m' -> m = S (S m'') -> cons_ex A n m.

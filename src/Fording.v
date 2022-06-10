@@ -49,26 +49,34 @@ returns
 the type of an index eqn abstraction,
 new context (with the new equalities)
 *)
-Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (idx_num arity nnewvars : nat) (t : term) : term :=
+(* Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (idx_num arity nnewvars : nat) (t : term) : term :=
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
   let type_of_x := lookup_ctx_type (arity+nnewvars-1-idx_num) Γ in
   let abstract_eqns (Γ : context) (ty : term) :=
       match ty with
       | tApp L R => 
-        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1) ; tApp L (lift (nnewvars-1) 0 R)] in
+        let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1) ; tApp L (lift (nnewvars-(idx_num+1)) (idx_num+1) R)] in
+(*         let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1) ; tApp L (lift (nnewvars-1-idx_num) 0 R)] in *)
         eqn
       | _ => 
         let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1); lift (nnewvars-1) 0 ty] in
         eqn
       end
-  in abstract_eqns Γ t.
+  in abstract_eqns Γ t. *)
 
+Fixpoint replace_trel_by (t : term) (n : nat) : term :=
+  match t with
+  | tRel _ => tRel n
+  | tApp l r => tApp (replace_trel_by l n) (replace_trel_by r n)
+  | t => t
+(*   | _ => tVar "replace_trel_by" *)
+  end.
 
-(* Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npars arity idx_num : nat) (t : term) : term :=
+Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (idx_num arity nnewvars : nat) (t : term) : term :=
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
-  let type_of_x := try_infer Σ Γ (lift (idx_num-1) 0 t) in 
-  mkApps (tEq gem) [type_of_x; tRel (arity+idx_num-1) ; (lift (idx_num-1) 0 t)]. *)
-
+  let type_of_x := lookup_ctx_type (arity+nnewvars-1-idx_num) Γ in
+  let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1); replace_trel_by t (arity+nnewvars-1)] in
+  eqn.
 
 Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=
   let args := firstn n l in
