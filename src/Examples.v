@@ -57,17 +57,23 @@ Inductive three_idx_ex (A : Type) (n :nat) (b :bool) (m : nat) : Type :=
 MetaCoq Run (build_ind List_3idx).
 MetaCoq Run (cmp_inds "List_3idx'" "three_idx_ex").
 
-Inductive List_cons (A : Type) : nat -> nat -> Type :=
+(* Inductive List_cons (A : Type) : nat -> nat -> Type :=
 | jcons : A -> forall o p: nat, List_cons A o p ->
               List_cons A (S o) (S (S p)).
+ *)
 
 
-Inductive cons_ex (A : Type) (n m : nat) : Type :=
+Inductive List_cons (A : Type) : nat -> nat -> nat -> Type :=
+| jcons : A -> forall o p q: nat, List_cons A o p q->
+              List_cons A q p (S o).
+
+(* Inductive cons_ex (A : Type) (n m : nat) : Type :=
     | jcons_size_ex : A -> forall m' m'' : nat, cons_ex A m' m'' ->
-                    n = S m' -> m = S (S m'') -> cons_ex A n m.
+                    n = S m' -> m = S (S m'') -> cons_ex A n m. *)
                     
-MetaCoq Run (printInductive "cons_ex").
+(* MetaCoq Run (printInductive "cons_ex"). *)
 MetaCoq Run (build_ind List_cons).
+MetaCoq Run (printInductive List_cons').
 MetaCoq Run (cmp_inds "List_cons'" "cons_ex").
 
 Inductive List_2size (A : Type) : nat -> nat -> Type :=

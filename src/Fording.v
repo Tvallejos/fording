@@ -4,6 +4,7 @@ Export ListNotations MCMonadNotation.
 (* Require Export List String. *)
 From MetaCoq.PCUIC Require Import PCUICAst PCUICLiftSubst.
 From MetaCoq.PCUIC Require Import PCUICToTemplate TemplateToPCUIC.
+From Coq Require Import Strings.BinaryString.
 
 Existing Instance config.default_checker_flags.
 Existing Instance default_fuel.  
@@ -138,10 +139,18 @@ Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npa
     cstr_arity := new_arity
   |}.
 
+Definition rep (n : nat) (s : string):=
+  let fix rep n s acc :=
+    match n with
+    | O => acc
+    | S n' => rep n' s (acc^s)
+    end in
+  rep n s "".
 
-Definition change_name (name : aname) : aname := 
+
+Definition change_name (name : aname) (n : nat): aname := 
   let (bind,relev) := name in
-  let newName := "new_name_change_name" in
+  let newName := "new_name_change_name" ^ rep n "'" in
   let newBind :=  (match bind with 
                   | nAnon => nNamed newName
                   | _ => bind end) 
@@ -149,11 +158,13 @@ Definition change_name (name : aname) : aname :=
   {| binder_name := newBind ; binder_relevance := relev|}.
                 
 
-Fixpoint replace_anon_names (t : term) : term :=
-  match t with 
-  | tProd na A B => tProd (change_name na) A (replace_anon_names B)
-  | _ => t 
-  end. 
+Definition replace_anon_names (t : term) : term :=
+  let fix replace t n :=
+    match t with 
+    | tProd na A B => tProd (change_name na n) A (replace B (S n))
+    | _ => t 
+  end in
+  replace t 0.
 
 
 Polymorphic Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (bodies : list one_inductive_body)
@@ -173,14 +184,16 @@ Polymorphic Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ :
           bodies.
 
 
-Fixpoint give_names_to_anon (inds : context) : context :=
-  match inds with
-  | nil => nil
-  | cons h t => let h' :=  {| decl_name := change_name (decl_name h); 
-                              decl_body := h.(decl_body); 
-                              decl_type := h.(decl_type) |} 
-                in h' :: (give_names_to_anon t)
-  end.
+Definition give_names_to_anon (inds : context) : context :=
+  let fix give_names inds n :=
+    match inds with
+    | nil => nil
+    | cons h t => let h' :=  {| decl_name := change_name (decl_name h) n; 
+                                decl_body := h.(decl_body); 
+                                decl_type := h.(decl_type) |} 
+                  in h' :: (give_names t (S n))
+    end in 
+    give_names inds 0.
 
 
 Polymorphic Definition build_mind (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (mind : mutual_inductive_body) (ind0 : inductive): mutual_inductive_body
