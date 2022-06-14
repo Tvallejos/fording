@@ -64,18 +64,20 @@ new context (with the new equalities)
       end
   in abstract_eqns Γ t. *)
 
-Fixpoint replace_trel_by (t : term) (n : nat) : term :=
+(* Fixpoint replace_trel_by (t : term) (n : nat) : term :=
   match t with
   | tRel _ => tRel n
   | tApp l r => tApp (replace_trel_by l n) (replace_trel_by r n)
+  (* add other constructors that may have terms *)
   | t => t
 (*   | _ => tVar "replace_trel_by" *)
   end.
+ *)
 
 Definition abstract_eqns (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (idx_num arity nnewvars : nat) (t : term) : term :=
   let gem := PCUICProgram.global_env_ext_map_global_env_map Σ in
   let type_of_x := lookup_ctx_type (arity+nnewvars-1-idx_num) Γ in
-  let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1); replace_trel_by t (arity+nnewvars-1)] in
+  let eqn := mkApps (tEq gem) [type_of_x; tRel (arity+nnewvars-1); lift idx_num 0 t ] in
   eqn.
 
 Definition split_at_n {A : Type} (l : list A) (n : nat) : (list A * list A) :=

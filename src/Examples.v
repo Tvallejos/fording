@@ -48,11 +48,11 @@ Inductive le_expected (n m : nat) : Prop :=
 MetaCoq Run (build_ind my_le).
 MetaCoq Run (cmp_inds "my_le'" "le_expected").
 
-Inductive List_3idx (A : Type) : nat -> bool -> nat -> Type :=
-| tweidxnil : List_3idx A 0 true (S (S 0)).
+Inductive List_3idx (A : Type) : string -> bool -> nat -> Type :=
+| tweidxnil : List_3idx A "" true (S (S 0)).
 
-Inductive three_idx_ex (A : Type) (n :nat) (b :bool) (m : nat) : Type :=
-    | nil_o_ex : n = 0 -> b = true -> m = S (S 0) -> three_idx_ex A n b m.
+Inductive three_idx_ex (A : Type) (s :string) (b :bool) (m : nat) : Type :=
+    | nil_o_ex : s = "" -> b = true -> m = S (S 0) -> three_idx_ex A s b m.
 
 MetaCoq Run (build_ind List_3idx).
 MetaCoq Run (cmp_inds "List_3idx'" "three_idx_ex").
@@ -101,6 +101,17 @@ Inductive even_expected (n : nat) : Prop :=
  with odd_expected (n : nat) : Prop :=
  | oddS_ex : forall m, even_expected m -> n = S m -> odd_expected n.
 
+(* Inductive tmp_fst (n : nat) (b : bool) : Prop :=
+ | tmpO : n = 0 -> b = true -> tmp n B
+ | tmpS : forall m : nat,
+            forall b : bool, tmp_snd m b -> n = S m ->
+            b = true -> tmp_fst n b
+            with
+  tmp_snd :  *)
+
+
+
+MetaCoq Run (printInductive "even_expected").
 MetaCoq Run (build_ind even).
 (* Inductive even3 : nat -> Prop :=
   | zero_is_even : even3 O
