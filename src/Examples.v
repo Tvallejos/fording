@@ -83,6 +83,19 @@ Inductive size_ex (A : Type) (n m : nat) : Type :=
 MetaCoq Run (build_ind List_2size).
 MetaCoq Run (cmp_inds "List_2size'" "size_ex").
 
+Inductive zero : nat -> Prop :=
+ | ezero : zero 0 
+ with one : nat -> Prop :=
+ | eone : forall n, zero n -> one (S n).
+
+Inductive zero_expected (n : nat) : Prop :=
+ | zero_ex : n = 0 -> zero_expected n 
+ with one_expected (n : nat) : Prop :=
+ | one_ex : forall m, zero_expected m -> n = S m -> one_expected n.
+
+MetaCoq Run (printInductive "zero_expected").
+MetaCoq Run (build_ind zero).
+
 Inductive even : nat -> Prop :=
  | evenO : even 0 
  | evenS : forall n, odd n -> even (S n)

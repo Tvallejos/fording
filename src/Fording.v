@@ -120,7 +120,7 @@ Fixpoint lift_ctx (n from : nat) (ctx: list context_decl) : list context_decl :=
   end.
 
 
-Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (nparams iter : nat) (cstr : constructor_body) : constructor_body :=
+Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (nparams nbodies body_num iter : nat) (cstr : constructor_body) : constructor_body :=
   let ctx_ := (cstr_args cstr) in
   let cstr_inds := (cstr_indices cstr) in
   let nnewvars := #|cstr_inds| in
@@ -160,13 +160,14 @@ Fixpoint replace_anon_names (t : term) : term :=
 
 Polymorphic Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (bodies : list one_inductive_body)
  (i0 : nat) (nparams : nat) : list one_inductive_body :=
-        mapi (fun (i : nat) (ind : one_inductive_body) => 
+ let nbodies := #|bodies| in
+        mapi (fun (body_num : nat) (ind : one_inductive_body) => 
         (* 'i' should be used when its mind definition *)
           {| 
           ind_name := tsl_ident (ind_name ind);
           ind_indices := [];
           ind_type  := replace_anon_names ind.(ind_type) ; 
-          ind_ctors :=  mapi (build_cstr Σ Γ nparams) (ind_ctors ind) ;
+          ind_ctors :=  mapi (build_cstr Σ Γ nparams nbodies body_num) (ind_ctors ind) ;
           (* just proj below *)
           ind_sort := ind.(ind_sort);
           ind_kelim := ind.(ind_kelim) ;
