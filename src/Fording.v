@@ -93,19 +93,19 @@ Fixpoint mkTProds (vars : context) (t : term) :=
   end.
 
 
-Definition gen_term_from_args (args : context) (nnewvars nparams : nat) : term := 
+Definition gen_term_from_args (args : context) (nnewvars nparams nbodies body_num : nat) : term := 
   let nap := #|args| in
   let fix gen_term_from_args (args : context) :=
     match args with
-    | nil => mkApps (tRel (nap)) (map (fun n=> tRel n) (rev (seq (nap-nparams) nparams)))
+    | nil => mkApps (tRel (nap+(nbodies-body_num-1))) (map (fun n=> tRel n) (rev (seq (nap-nparams) nparams)))
     | h :: t => let (na,_,ty) := h in
                 tProd na ty (gen_term_from_args t)
     end in
   gen_term_from_args args.
 
 
-Definition build_type (t:term) (args : context) (nnewvars nparams : nat) : term := 
-  gen_term_from_args args nnewvars nparams.
+Definition build_type (t:term) (args : context) (nnewvars nparams nbodies body_num: nat) : term := 
+  gen_term_from_args args nnewvars nparams nbodies body_num.
 
 
 Definition lift_decl (n from : nat) (decl : context_decl ) : context_decl :=
@@ -130,7 +130,7 @@ Definition build_cstr (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (npa
   (* IT DEPENDS ON THE TYPE OF THE IDX *)
   let nanon := (mkBindAnn nAnon Relevant) in 
   let new_ctx := fold_left (fun g eq=> g ,, vass nanon eq) inds ctx in 
-  let type := build_type cstr.(cstr_type) (rev new_ctx) nnewvars nparams in 
+  let type := build_type cstr.(cstr_type) (rev new_ctx) nnewvars nparams nbodies body_num in 
   let new_arity :=cstr.(cstr_arity) + nnewvars in
   {|
     cstr_name:= tsl_ident (cstr_name cstr) ;
