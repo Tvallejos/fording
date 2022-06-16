@@ -6,17 +6,6 @@ From MetaCoq.PCUIC Require Import PCUICToTemplate TemplateToPCUIC.
 Open Scope string_scope.
 Class TslIdent := { tsl_ident : ident -> ident }. 
 Instance prime_tsl_ident : TslIdent := {| tsl_ident := fun id => id ^ "'" |}. 
-
-Definition make_plugin {X} (f : PCUICProgram.global_env_map -> context -> term -> term) (x : X) {Y} : TemplateMonad Y :=
-  tmBind (tmQuoteRec x) (fun '(Sigma, q_x) =>
-                         let sig' := (TemplateToPCUIC.trans_global_env Sigma) in 
-                           tmUnquoteTyped Y 
-                           (PCUICToTemplate.trans (f 
-                                                  sig'
-                                                  []
-                                                  (TemplateToPCUIC.trans sig' q_x)))).
-
-
 Definition tEq ctx:= TemplateToPCUIC.trans ctx <% @eq %>.
 
 
