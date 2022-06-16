@@ -1,5 +1,6 @@
 From MetaCoq.Fording Require Import Fording Testing.
-From MetaCoq.Template Require Import utils. 
+From MetaCoq.Template Require Import utils All. 
+(* From MetaCoq.PCUIC Require Import Bidirectional.BDTyping. *)
 
 Inductive nonzero (A : Type) : nat -> Prop := 
   C m :  nonzero A (S m). 
@@ -20,7 +21,6 @@ Inductive zList (A : Type) : nat -> Type :=
 Inductive zLexpected (A : Type) (n : nat) : Type :=
 | znilexpected : n = 0 -> zLexpected A n.
 
-MetaCoq Run (printInductive "zLexpected").
 MetaCoq Run (build_ind zList).
 MetaCoq Run (cmp_inds "zList'" "zLexpected").
 
@@ -66,7 +66,6 @@ Inductive cons_ex (A : Type) (n m : nat) : Type :=
     | jcons_size_ex : A -> forall m' m'' : nat, cons_ex A m' m'' ->
                     n = S m' -> m = S (S m'') -> cons_ex A n m.
                     
-MetaCoq Run (printInductive "cons_ex").
 MetaCoq Run (build_ind List_cons).
 MetaCoq Run (cmp_inds "List_cons'" "cons_ex").
 
@@ -93,8 +92,8 @@ Inductive zero_expected (n : nat) : Prop :=
  with one_expected (n : nat) : Prop :=
  | one_ex : forall m, zero_expected m -> n = S m -> one_expected n.
 
-MetaCoq Run (printInductive "zero_expected").
 MetaCoq Run (build_ind zero).
+MetaCoq Run (cmp_inds "zero'" "zero_expected").
 
 Inductive even : nat -> Prop :=
  | evenO : even 0 
@@ -114,51 +113,5 @@ Inductive even_expected (n : nat) : Prop :=
  with odd_expected (n : nat) : Prop :=
  | oddS_ex : forall m, even_expected m -> n = S m -> odd_expected n.
 
-(* Inductive tmp_fst (n : nat) (b : bool) : Prop :=
- | tmpO : n = 0 -> b = true -> tmp n B
- | tmpS : forall m : nat,
-            forall b : bool, tmp_snd m b -> n = S m ->
-            b = true -> tmp_fst n b
-            with
-  tmp_snd :  *)
-
-
-
-MetaCoq Run (printInductive "even_expected").
 MetaCoq Run (build_ind even).
-(* Inductive even3 : nat -> Prop :=
-  | zero_is_even : even3 O
-  | S_of_odd_is_even : (forall n:nat, odd n -> even3 (S n))
-with odd3 : nat -> Prop :=
-  | S_of_even_is_odd : (forall n:nat, even n -> odd3 (S n)). *)
-
-(*  Inductive tree(A:Set) : Set :=
-  | node : A -> forest A -> tree A
-with forest (A: Set) : Set :=
-  | nochild : forest A 
-  | addchild : tree A -> forest A -> forest A.
-
-Inductive tree2 : Set :=
-| node2 : forest2 -> tree2
-with forest2 : Set :=
-| emptyf : forest2
-| consf : tree2 -> forest2 -> forest2. *)
-
-(*   Inductive value (nvalue : nat) : Type :=
-  | var_value : fin (nvalue) -> value (nvalue)
-  | u : value (nvalue)
-  | pair : value (nvalue) -> value (nvalue) -> value (nvalue)
-  | inj : bool -> value (nvalue) -> value (nvalue)
-  | thunk : comp (nvalue) -> value (nvalue)
- with comp (nvalue : nat) : Type :=
-  | cu : comp (nvalue)
-  | force : value (nvalue) -> comp (nvalue)
-  | lambda : comp (S nvalue) -> comp (nvalue)
-  | app : comp (nvalue) -> value (nvalue) -> comp (nvalue)
-  | tuple : comp (nvalue) -> comp (nvalue) -> comp (nvalue)
-  | ret : value (nvalue) -> comp (nvalue)
-  | letin : comp (nvalue) -> comp (S nvalue) -> comp (nvalue)
-  | proj : bool -> comp (nvalue) -> comp (nvalue)
-  | caseZ : value (nvalue) -> comp (nvalue)
-  | caseS : value (nvalue) -> comp (S nvalue) -> comp (S nvalue) -> comp (nvalue)
-  | caseP : value (nvalue) -> comp (S (S nvalue)) -> comp (nvalue). *)
+MetaCoq Run (cmp_inds "even'" "even_expected").
