@@ -114,7 +114,7 @@ Fixpoint replace_anon_names (t : term) : term :=
   Builds a new body based on a previous one by generalizing every constructor 
 *)
 Definition build_bodies (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (bodies : list one_inductive_body)
- (i0 : nat) (nparams : nat) : list one_inductive_body :=
+  (nparams : nat) : list one_inductive_body :=
  let nbodies := #|bodies| in
         mapi (fun (body_num : nat) (ind : one_inductive_body) => 
           {| 
@@ -158,14 +158,13 @@ Definition build_mind (Σ : PCUICProgram.global_env_ext_map) (Γ : context) (min
   let params' := app inds' mind.(ind_params) in
   (* parameters now include the indexes (now with name) *)
   let nparams := mind.(ind_npars) + #|inds'| in
-  let i0 := inductive_ind ind0 in
      {| ind_finite := mind.(ind_finite);
         ind_npars :=  nparams;
         ind_params :=  params' ;
         ind_universes := mind.(ind_universes) ; 
         ind_variance := mind.(ind_variance);
         ind_bodies :=  
-        build_bodies Σ (app params' Γ) (mind.(ind_bodies)) i0 nparams 
+        build_bodies Σ (app params' Γ) (mind.(ind_bodies)) nparams 
       |}.
 
 
